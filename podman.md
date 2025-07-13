@@ -1,4 +1,4 @@
-```markdown
+`markdown
 # LLD: Secure CI/CD with GitLab Runner, Kubernetes, and Rootless Podman
 
 ## 1. Problem Statement
@@ -238,4 +238,4 @@ integration-test:
 *   **PVCs for Caches:** Used for build tool and container image caching to ensure persistence and high performance across multiple jobs.
 *   **`vfs` Storage Driver:** Selected for the Podman service as it is the most stable and compatible driver for running inside an unprivileged container without access to kernel overlay filesystems.
 *   **Disable Ryuk (`TESTCONTAINERS_RYUK_DISABLED`):** Ryuk is the resource reaper for Testcontainers. It is unnecessary and problematic in this environment, as Kubernetes is responsible for cleaning up the entire pod and all its resources.
-```
+`
