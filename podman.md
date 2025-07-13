@@ -3,7 +3,8 @@
 
 ## 1. Problem Statement
 
-I want to use GitLab Runner with the Kubernetes executor for CI/CD pipelines. A critical requirement is the ability to run integration tests that depend on external services like databases (PostgreSQL, Redis) and object storage (Minio). The standard approach for this has been Testcontainers, a library that programmatically spins up Docker containers.
+I want to use GitLab Runner with the Kubernetes executor for CI/CD pipelines. A critical requirement is the ability to run
+integration tests that depend on external services like databases (PostgreSQL, Redis) and object storage (Minio). The standard approach for this has been Testcontainers, a library that programmatically spins up Docker containers.
 
 The previous solution using Docker-in-Docker (DinD) is not secure and scalable and will not pass through security assessment due to its inherent risks, primarily the requirement for `privileged` containers, which effectively grants root access to the underlying Kubernetes node.
 
