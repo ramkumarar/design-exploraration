@@ -1,4 +1,3 @@
-`markdown
 # LLD: Secure CI/CD with GitLab Runner, Kubernetes, and Rootless Podman
 
 ## 1. Problem Statement
@@ -322,4 +321,4 @@ sequenceDiagram
 
     Podman Service-->>Testcontainers: Container is ready
 ```
-`
+
