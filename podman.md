@@ -4,7 +4,8 @@
 ## 1. Problem Statement
 
 I want to use GitLab Runner with the Kubernetes executor for CI/CD pipelines. A critical requirement is the ability to run
-integration tests that depend on external services like databases (PostgreSQL, Redis) and object storage (Minio). The standard approach for this has been Testcontainers, a library that programmatically spins up Docker containers.
+integration tests that depend on external services like databases (PostgreSQL, Redis) and object storage (Minio).
+The standard approach for this has been Testcontainers, a library that programmatically spins up Docker containers.
 
 The previous solution using Docker-in-Docker (DinD) is not secure and scalable and will not pass through security assessment due to its inherent risks, primarily the requirement for `privileged` containers, which effectively grants root access to the underlying Kubernetes node.
 
@@ -17,7 +18,8 @@ We need a replacement architecture that:
 
 ## 2. Proposed Solution Overview
 
-The proposed solution is to leverage **rootless Podman** running as a sidecar "service" container within the GitLab Runner job pod. The build container, containing the Testcontainers library, will communicate with the Podman service via a shared Unix socket. All containers (build, service, and test containers) run within a single, unprivileged Kubernetes pod, sharing a network namespace and volumes.
+The proposed solution is to leverage **rootless Podman** running as a sidecar "service" container within the GitLab Runner job pod. The build container, containing the Testcontainers library, will communicate with the Podman service via a shared Unix socket.
+All containers (build, service, and test containers) run within a single, unprivileged Kubernetes pod, sharing a network namespace and volumes.
 
 This design achieves all goals by replacing the high-risk privileged Docker daemon with a secure, rootless Podman daemon scoped entirely to the lifecycle and permissions of a single CI job pod.
 
