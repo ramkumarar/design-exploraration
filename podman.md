@@ -1,11 +1,9 @@
-`markdown
+```markdown
 # LLD: Secure CI/CD with GitLab Runner, Kubernetes, and Rootless Podman
 
 ## 1. Problem Statement
 
-I want to use GitLab Runner with the Kubernetes executor for CI/CD pipelines. A critical requirement is the ability to run
-integration tests that depend on external services like databases (PostgreSQL, Redis) and object storage (Minio).
-The standard approach for this has been Testcontainers, a library that programmatically spins up Docker containers.
+I want to use GitLab Runner with the Kubernetes executor for CI/CD pipelines. A critical requirement is the ability to run integration tests that depend on external services like databases (PostgreSQL, Redis) and object storage (Minio). The standard approach for this has been Testcontainers, a library that programmatically spins up Docker containers.
 
 The previous solution using Docker-in-Docker (DinD) is not secure and scalable and will not pass through security assessment due to its inherent risks, primarily the requirement for `privileged` containers, which effectively grants root access to the underlying Kubernetes node.
 
@@ -18,8 +16,7 @@ We need a replacement architecture that:
 
 ## 2. Proposed Solution Overview
 
-The proposed solution is to leverage **rootless Podman** running as a sidecar "service" container within the GitLab Runner job pod. The build container, containing the Testcontainers library, will communicate with the Podman service via a shared Unix socket.
-All containers (build, service, and test containers) run within a single, unprivileged Kubernetes pod, sharing a network namespace and volumes.
+The proposed solution is to leverage **rootless Podman** running as a sidecar "service" container within the GitLab Runner job pod. The build container, containing the Testcontainers library, will communicate with the Podman service via a shared Unix socket. All containers (build, service, and test containers) run within a single, unprivileged Kubernetes pod, sharing a network namespace and volumes.
 
 This design achieves all goals by replacing the high-risk privileged Docker daemon with a secure, rootless Podman daemon scoped entirely to the lifecycle and permissions of a single CI job pod.
 
@@ -38,7 +35,7 @@ This design achieves all goals by replacing the high-risk privileged Docker daem
 ### 3.2. Architectural Diagram
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────────────┐
+┌──────────────────��───────────────────────────────────────────────────────────────┐
 │                             KUBERNETES CLUSTER                                   │
 │                                                                                  │
 │  ┌────────────────────────────────────────────────────────────────────────────┐  │
@@ -55,7 +52,7 @@ This design achieves all goals by replacing the high-risk privileged Docker daem
 │  │  │                          │      │                                   │   │  │
 │  │  │ DOCKER_HOST=             │      │ ┌───────────────────────────────┐ │   │  │
 │  │  │ /sockets/podman.sock     │◄─────┼─► Creates containers on request │ │   │  │
-│  │  └───────────┬──────────────┘      │ └───────────────────────────────┘ │   │  │
+│  │  └───────────┬──────────────┘      │ └───────���───────────────────────┘ │   │  │
 │  │              │                     │        │                          │   │  │
 │  │              │(localhost:5432)     │        ▼                          │   │  │
 │  │              │                     │  ┌───────────────────────────┐    │   │  │
@@ -63,21 +60,25 @@ This design achieves all goals by replacing the high-risk privileged Docker daem
 │  │                                    │  │ (Inside this Pod's Net NS)  │    │   │  │
 │  │                                    │  │  - Postgres Container       │    │   │  │
 │  │                                    │  └───────────────────────────┘    │   │  │
-│  └────────────────────────────────────┴────────────────────────────────────┘   │  │
-│                          ▲                          ▲                          │
-│                          │ (Volume Mounts)          │ (Volume Mounts)          │
-│  ┌───────────────────────┴──────────────────────────┴───────────────────────┐  │
+│  └──────────────┬─────────────────────┴─────────────────────┬───────────────���   │
+│                 │ (Mounts: /sockets, /cache)                │ (Mounts: /sockets, /podman-data)
+│                 │                                           │
+│  ┌──────────────┴───────────────────────────────────────────┴───────────────┐  │
 │  │                               SHARED VOLUMES                             │  │
 │  │ ┌────────────────────────┐  ┌──────────────────┐  ┌────────────────────┐ │  │
-│  │ │ emptyDir (in-memory)   │  │ PVC: build-cache │  │ PVC: podman-cache  │ │  │
+│  │ │ emptyDir (in-memory)   │  │ PVC: build-cache │  │ PVC: image-cache  │ │  │
 │  │ │ Mount: /sockets        │  │ Mount: /cache    │  │ Mount: /podman-data│ │  │
 │  │ │ ---------------------- │  │ ---------------- │  │ ------------------ │ │  │
 │  │ │ 📄 podman.sock         │  │ 📁 .m2/          │  │ 📁 storage/        │ │  │
-│  │ └────────────────────────┘  └──────────────────┘  └────────────────────┘ │  │
+│  │ └──────���─────────────────┘  └──────────────────┘  └────────────────────┘ │  │
 │  └──────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                  │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+
+![Gitlab Runner with Podman Architecture](gtilab_runner_podman_architecture.png)
+
 
 ## 4. The Role of the Unix Socket (`podman.sock`)
 
@@ -96,14 +97,19 @@ Libraries like **Testcontainers are hard-coded to communicate using the Docker E
 
 This compatibility layer allows us to adopt Podman for its security benefits without needing to change or fork popular tools like Testcontainers.
 
-### 4.3. Lifecycle and Hosting on `emptyDir`
-The socket is ephemeral and only needs to exist for the duration of a single CI job. Using a Kubernetes `emptyDir` volume is the perfect choice for this:
+### 4.3. Lifecycle, Concurrency, and Cleanup with `emptyDir`
+The socket is ephemeral and only needs to exist for the duration of a single CI job. Using a Kubernetes `emptyDir` volume is the perfect choice for this, as its lifecycle is managed directly by Kubernetes, providing key guarantees for concurrency and cleanup.
+
+*   **Creation:** The `emptyDir` volume is created by the **Kubernetes system** on the node when a new Job Pod is scheduled. It is an integral part of the Pod's specification, not created by the containers themselves.
+
+*   **Concurrency and Isolation:** This architecture is inherently safe for concurrent builds. Each CI job runs in a **separate, isolated Kubernetes Pod**. Consequently, each Pod receives its own private `emptyDir` volume. If 10 jobs run concurrently, Kubernetes creates 10 Pods, each with its own unique in-memory socket directory. There is no risk of conflict, as volumes are never shared between Pods.
+
 *   **Performance:** We configure the `emptyDir` with `medium: Memory`, which creates a `tmpfs` (in-memory) filesystem. Communication over the socket is extremely fast, as it avoids disk I/O and network latency. This is critical for the rapid creation and destruction of test containers.
-*   **Isolation:** The `emptyDir` volume is created when the pod starts and is completely destroyed when the pod terminates. The socket is never exposed outside the pod, preventing any other workload on the cluster from accessing it.
-*   **Simplicity:** No persistent state is needed for the socket, so `emptyDir` avoids the overhead and complexity of using a PVC.
+
+*   **Cleanup and After-Effects:** The lifecycle of an `emptyDir` is tied directly to its Pod. When the build job finishes and the Pod is terminated, the `emptyDir` volume and all its contents (i.e., the `podman.sock` file) are **permanently and automatically destroyed**. This ensures that no state or artifacts are left behind, guaranteeing a clean and ephemeral environment for every new build.
 
 The communication flow is as follows:
-1.  The `podman-service` container starts and creates the `/sockets/podman.sock` file.
+1.  The `podman-service` container starts and creates the `/sockets/podman.sock` file within the Pod's private `emptyDir`.
 2.  The `build` container, via Testcontainers, connects to this same file at `/sockets/podman.sock`.
 3.  Since both containers have the `/sockets` volume mounted, they are accessing the exact same in-memory file, enabling seamless communication.
 
@@ -130,7 +136,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: gitlab-podman-cache-pvc
+  name: gitlab-image-cache-pvc
 spec:
   accessModes:
     - ReadWriteOnce
@@ -172,9 +178,9 @@ This configuration is the key to enabling the architecture.
       name = "gitlab-build-cache-pvc"
       mount_path = "/cache"
 
-    # Volume for persistent Podman image caches
+    # Volume for persistent container image caches
     [[runners.kubernetes.volumes.pvc]]
-      name = "gitlab-podman-cache-pvc"
+      name = "gitlab-image-cache-pvc"
       mount_path = "/podman-data"
 
     # Define the Podman sidecar service
@@ -238,4 +244,82 @@ integration-test:
 *   **PVCs for Caches:** Used for build tool and container image caching to ensure persistence and high performance across multiple jobs.
 *   **`vfs` Storage Driver:** Selected for the Podman service as it is the most stable and compatible driver for running inside an unprivileged container without access to kernel overlay filesystems.
 *   **Disable Ryuk (`TESTCONTAINERS_RYUK_DISABLED`):** Ryuk is the resource reaper for Testcontainers. It is unnecessary and problematic in this environment, as Kubernetes is responsible for cleaning up the entire pod and all its resources.
-`
+
+## 8. Sequence Diagrams
+
+### 8.1. CI Job and Testcontainers Flow
+
+This diagram shows the end-to-end process, from the GitLab Runner starting a job to the build container successfully communicating with a test container via the Podman sidecar.
+
+```mermaid
+sequenceDiagram
+    participant GitLab Runner
+    participant K8s API Server
+    participant Job Pod
+    participant Podman Service
+    participant Build Container
+    participant Testcontainers
+
+    GitLab Runner->>K8s API Server: Create Pod Request (2 containers, 3 volumes)
+    K8s API Server-->>Job Pod: Pod is scheduled and starts on a Node
+    
+    activate Job Pod
+    Job Pod->>Podman Service: Start container
+    activate Podman Service
+    Podman Service->>Podman Service: Start `podman system service`
+    Podman Service-->>Job Pod: Creates /sockets/podman.sock
+    deactivate Podman Service
+
+    Job Pod->>Build Container: Start container
+    activate Build Container
+    Build Container->>Build Container: Run `mvn clean verify`
+    Build Container->>Testcontainers: Initialize()
+    activate Testcontainers
+    
+    Testcontainers->>Podman Service: POST /containers/create (via podman.sock)
+    activate Podman Service
+    Podman Service->>Podman Service: Creates Postgres container inside Pod's network namespace
+    Podman Service-->>Testcontainers: Respond with container info (port maps to localhost)
+    deactivate Podman Service
+    
+    Testcontainers-->>Build Container: Return connection details (e.g., jdbc:postgresql://localhost:5432/test)
+    deactivate Testcontainers
+    
+    Build Container->>Build Container: Application tests connect to Postgres on localhost
+    
+    deactivate Build Container
+    deactivate Job Pod
+```
+
+### 8.2. Podman Image Caching Flow
+
+This diagram illustrates how the Persistent Volume Claim (PVC) for Podman storage is used to cache container images across different CI jobs, speeding up builds.
+
+```mermaid
+sequenceDiagram
+    participant Build Container
+    participant Testcontainers
+    participant Podman Service
+    participant Podman Storage (PVC)
+    participant Remote Registry
+
+    Build Container->>Testcontainers: Request "postgres:15" container
+
+    alt First Job (Cache Miss)
+        Testcontainers->>Podman Service: Request image "postgres:15"
+        Podman Service->>Podman Storage (PVC): Check for image in /podman-data/storage
+        Podman Storage (PVC)-->>Podman Service: Image not found
+        Podman Service->>Remote Registry: Pull image "postgres:15"
+        Remote Registry-->>Podman Service: Image data
+        Podman Service->>Podman Storage (PVC): Store image layers in persistent volume
+        Podman Service->>Podman Service: Create container from newly pulled image
+    else Subsequent Job (Cache Hit)
+        Testcontainers->>Podman Service: Request image "postgres:15"
+        Podman Service->>Podman Storage (PVC): Check for image in /podman-data/storage
+        Podman Storage (PVC)-->>Podman Service: Image found in cache
+        Podman Service->>Podman Service: Create container directly from cached image
+    end
+
+    Podman Service-->>Testcontainers: Container is ready
+```
+```
