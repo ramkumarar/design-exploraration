@@ -2,3 +2,7 @@ docker run -p 8080:8080 -e SWAGGER_JSON_URL=http://localhost:3000/api-spec.yaml 
 npm install -g @stoplight/prism-cli
 prism mock your-api-spec.yaml
 prism mock api-spec.yaml --dynamic --examples
+
+
+https://github.com/KarnerTh/mermerd
+https://github.com/k1LoW/tbls?tab=readme-ov-file
