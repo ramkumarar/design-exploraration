@@ -6,3 +6,4 @@ prism mock api-spec.yaml --dynamic --examples
 
 https://github.com/KarnerTh/mermerd
 https://github.com/k1LoW/tbls?tab=readme-ov-file
+npm install -g @dbml/cli@2.5.0
