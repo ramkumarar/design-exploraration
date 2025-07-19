@@ -1,0 +1,72 @@
+import org.testcontainers.containers.KafkaContainer;
+import org.testcontainers.utility.DockerImageName;
+
+// This would be in your application's startup logic or a @Configuration class
+
+public class KafkaManager {
+
+    // Define the FIXED port you will use on the host machine.
+    // Make sure this port is not used by anything else.
+    public static final int KAFKA_JMX_HOST_PORT = 9997;
+    private static final int KAFKA_JMX_CONTAINER_PORT = 9997;
+
+    public void startKafka() {
+        DockerImageName kafkaImage = DockerImageName.parse("confluentinc/cp-kafka:7.6.1");
+
+        KafkaContainer kafka = new KafkaContainer(kafkaImage)
+                // --- JMX Configuration ---
+                .withEnv("KAFKA_JMX_PORT", String.valueOf(KAFKA_JMX_CONTAINER_PORT))
+                // This is CRITICAL. It tells JMX to bind to an address that is accessible
+                // from outside the container's network namespace.
+                .withEnv("KAFKA_JMX_HOSTNAME", "localhost") 
+                .withEnv("KAFKA_JMX_OPTS", "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=localhost")
+                
+                // --- Port Mapping Configuration ---
+                // This maps the container's internal JMX port to a FIXED port on the host machine.
+                .withFixedExposedPort(KAFKA_JMX_HOST_PORT, KAFKA_JMX_CONTAINER_PORT);
+                // For older Testcontainers versions, you might use:
+                // .addFixedExposedPort(KAFKA_JMX_HOST_PORT, KAFKA_JMX_CONTAINER_PORT);
+
+        kafka.start();
+
+        System.out.println("Kafka Broker started: " + kafka.getBootstrapServers());
+        System.out.println("Kafka JMX is exposed on HOST port: " + KAFKA_JMX_HOST_PORT);
+        // The application can now run indefinitely...
+    }
+}
+
+
+# otel-collector-config.yaml
+
+receivers:
+  jmx:
+    # Path to the JMX Metric Gatherer JAR, pre-installed in the -contrib image
+    jar_path: /opt/opentelemetry-jmx-metrics.jar
+    
+    # --- The KEY Configuration ---
+    # Connect to the host machine on the fixed port you defined.
+    endpoint: host.docker.internal:9997
+    
+    # Use the pre-canned metric set for Kafka
+    target_system: kafka
+    
+    collection_interval: 15s
+
+exporters:
+  # Your exporter for Mimir/Prometheus
+  prometheusremotewrite:
+    endpoint: http://mimir:8080/api/v1/write
+    # ... other settings like tls, headers etc.
+
+  # You might also have exporters for Loki (logs) and Tempo (traces)
+  # ...
+
+processors:
+  batch:
+
+service:
+  pipelines:
+    metrics:
+      receivers: [jmx]
+      processors: [batch]
+      exporters: [prometheusremotewrite]
