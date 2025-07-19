@@ -115,3 +115,5 @@ public class Application {
         // Your application logic would continue here...
     }
 }
+
+.withEnv("KAFKA_ADVERTISED_LISTENERS", "PLAINTEXT://" + kafkaAlias + ":9092");
