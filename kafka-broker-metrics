@@ -70,3 +70,48 @@ service:
       receivers: [jmx]
       processors: [batch]
       exporters: [prometheusremotewrite]
+
+
+
+import org.testcontainers.containers.KafkaContainer;
+import org.testcontainers.utility.DockerImageName;
+
+/**
+ * A simple KafkaContainer that allows binding its JMX port to a fixed port on the host machine.
+ */
+public class FixedPortKafkaContainer extends KafkaContainer {
+
+    public FixedPortKafkaContainer(DockerImageName dockerImageName, int hostPort, int containerPort) {
+        super(dockerImageName);
+        
+        // This single line is the magic. It calls the protected method from within
+        // the subclass, which is allowed in Java.
+        super.addFixedExposedPort(hostPort, containerPort);
+    }
+}
+
+import org.testcontainers.utility.DockerImageName;
+
+public class Application {
+
+    public static void main(String[] args) {
+        // Define your image and fixed JMX port
+        DockerImageName kafkaImage = DockerImageName.parse("confluentinc/cp-kafka:7.6.1");
+        int jmxHostPort = 9997;
+
+        // --- This is the simplified part ---
+        // Use your new helper class. The code is now very readable.
+        FixedPortKafkaContainer kafka = new FixedPortKafkaContainer(kafkaImage, jmxHostPort, 9997)
+            .withEnv("KAFKA_JMX_PORT", "9997")
+            .withEnv("KAFKA_JMX_HOSTNAME", "localhost")
+            .withEnv("KAFKA_JMX_OPTS", "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=localhost");
+
+        // Start the container
+        kafka.start();
+
+        System.out.println("✅ Kafka started!");
+        System.out.println("   -> JMX is available on localhost:" + jmxHostPort);
+
+        // Your application logic would continue here...
+    }
+}
