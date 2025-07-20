@@ -117,3 +117,6 @@ public class Application {
 }
 
 .withEnv("KAFKA_ADVERTISED_LISTENERS", "PLAINTEXT://" + kafkaAlias + ":9092");
+
+docker cp otel-collector:/opt/opentelemetry-java-contrib-jmx-metrics.jar .
+
