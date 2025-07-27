@@ -1,0 +1,79 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "google": {      
+      
+      "models": {
+        "gemini-2.5-pro": {
+          "name": "gemini-2.5-pro"
+        }
+      }
+    }
+  },
+  "mode": {
+    "build": {
+      "model": "google/gemini-2.5-pro",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "read": true,
+        "grep": true,
+        "glob": true,
+        "list": true,
+        "patch": true,
+        "todowrite": true,
+        "todoread": true,
+        "webfetch": true
+      }
+    },
+    "plan": {
+      "model": "google/gemini-2.5-pro",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      }
+    },
+    "readonly": {
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "read": true,
+        "grep": true,
+        "glob": true,
+        "list": true,
+        "todoread": true
+      }
+    }
+  }
+}
+
+"provider": {
+    "lmstudio": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LM Studio (local)",
+      "options": {
+        "baseURL": "1"
+      },
+      "models": {
+        "google/gemma-3-12b": {
+          "name": "gemma 3-12b"
+        },
+        "qwen/qwen3-30b-a3b": {
+          "name": "qwen/qwen3-30b-a3b",
+          "tools": true
+        },
+        "deepseek/deepseek-r1-0528-qwen3-8b":{
+         "tools": true,
+         "thinking": false,
+         "reasoning": true
+        },
+        "jan-nano":{
+          "tools": true
+        }
+      }
+    }
+  }
+https://github.com/sst/opencode/issues/272
