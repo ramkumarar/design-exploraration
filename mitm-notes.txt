@@ -1,0 +1,22 @@
+
+localhost:8090 {
+     log {
+        output stdout
+    }
+    handle /someposts* {
+        reverse_proxy https://jsonplaceholder.typicode.com {
+            header_up Host jsonplaceholder.typicode.com
+            rewrite /posts
+        }
+    }
+    
+    respond "Caddy is running!" 200
+}
+
+curl -k https://localhost:8090/someposts
+
+mv mitmproxy-ca-cert.pem /usr/local/share/ca-certificates/mitmproxy.crt
+sudo update-ca-certificates
+
+mitmweb --mode reverse:https://jsonplaceholder.typicode.com@8091 --listen-host 127.0.0.1 --listen-port 8091 --certs *=%USERPROFILE%\.mitmproxy\mitmproxy-ca-cert.pem
+mitmweb --mode reverse:https://jsonplaceholder.typicode.com@8091 --listen-host 127.0.0.1 --listen-port 8091 --certs *=~/.mitmproxy/mitmproxy-ca-cert.pem
