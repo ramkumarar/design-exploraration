@@ -193,6 +193,8 @@ gcloud auth activate-service-account --key-file=path/to/service-account.json
 gcloud auth print-access-token
 ```
 
+https://atamel.dev/posts/2024/02-26_vertexai_gemini_generate_content_api/
+
 ## Notes
 
 1. **Authentication**: All requests require a valid OAuth 2.0 Bearer token in the Authorization header
