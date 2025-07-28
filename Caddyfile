@@ -1,0 +1,18 @@
+
+localhost:8090 {
+     log {
+        output stdout
+    }
+    handle /someposts* {
+        reverse_proxy https://localhost:8091 {
+            header_up Host jsonplaceholder.typicode.com
+            header_up X-Forwarded-Proto https
+            rewrite /posts
+            transport http {
+                tls_insecure_skip_verify
+            }
+        }
+    }
+    
+    respond "Caddy is running!" 200
+}
