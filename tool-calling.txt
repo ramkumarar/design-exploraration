@@ -1,0 +1,52 @@
+curl -X POST "YOUR_GEMINI_ENDPOINT" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "contents": [
+      {
+        "role": "user",
+        "parts": [{"text": "What is the weather like in New York?"}]
+      }
+    ],
+    "tools": [
+      {
+        "function_declarations": [
+          {
+            "name": "get_weather",
+            "description": "Get current weather information for a city",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "location": {
+                  "type": "string",
+                  "description": "The city name"
+                }
+              },
+              "required": ["location"]
+            }
+          }
+        ]
+      }
+    ]
+  }'
+
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "functionCall": {
+              "name": "get_weather",
+              "args": {
+                "location": "New York"
+              }
+            }
+          }
+        ]
+      },
+      "finishReason": "STOP"
+    }
+  ]
+}
