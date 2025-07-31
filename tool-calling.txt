@@ -50,3 +50,98 @@ curl -X POST "YOUR_GEMINI_ENDPOINT" \
     }
   ]
 }
+
+
+curl -X POST "YOUR_GEMINI_ENDPOINT" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "contents": [
+      {
+        "role": "user", 
+        "parts": [{"text": "Hello there, what tools do you have available?"}]
+      }
+    ],
+    "tools": [
+      {
+        "function_declarations": [
+          {
+            "name": "hello_world",
+            "description": "Say hello to someone",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the person to greet"
+                }
+              },
+              "required": ["name"]
+            }
+          },
+          {
+            "name": "get_time",
+            "description": "Get current time",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        ]
+      }
+    ]
+  }'
+
+curl -X POST "YOUR_GEMINI_ENDPOINT" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "contents": [
+      {
+        "role": "user",
+        "parts": [{"text": "What is the weather like in New York?"}]
+      },
+      {
+        "role": "model",
+        "parts": [
+          {
+            "functionCall": {
+              "name": "get_weather",
+              "args": {"location": "New York"}
+            }
+          }
+        ]
+      },
+      {
+        "role": "function",
+        "parts": [
+          {
+            "functionResponse": {
+              "name": "get_weather",
+              "response": {
+                "weather": "sunny, 72°F"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "tools": [
+      {
+        "function_declarations": [
+          {
+            "name": "get_weather",
+            "description": "Get current weather information for a city",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "location": {"type": "string", "description": "The city name"}
+              },
+              "required": ["location"]
+            }
+          }
+        ]
+      }
+    ]
+  }'
+
